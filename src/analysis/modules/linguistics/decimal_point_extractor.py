@@ -60,22 +60,23 @@ def check_decimal_matches(potential_matches, block, chapter_numbers, error_toler
         match_end = match.offset + match.error_length
         after_text = block.contents[match_end:].lstrip()
         before_text = block.contents[:match.offset].rstrip()
-        if re.match(r'[^.\d]*\.[ .]{4,}', block.contents):
+        end_check_idx = min(match_end+15, len(block.contents))
+        following_text = re.findall(r'[^.()\[\]{}:,;\s]+',block.contents[match_end:end_check_idx].lower())
+        begin_check_idx = max(match.offset-15, 0)
+        previous_text = re.findall(r'[^.()\[\]{}:,;\s]+', block.contents[begin_check_idx:match.offset].lower())
+        in_black_list = len(black_list.intersection(following_text)) > 0
+        if re.match(r'[^.\d]*\.[ .]{4,}', block.contents) and not in_black_list:
             chapter_numbers.add(match.content)
-            continue 
-        if match.content in chapter_numbers:
+            continue
+        if match.content in chapter_numbers and not in_black_list:
             continue
         if (before_text.endswith('[') or before_text.endswith('(')) and (after_text.startswith(']') or after_text.startswith(')')):
             continue
-        end_check_idx = min(match_end+30, len(block.contents))
-        following_text = re.findall(r'[^.()\[\]{}:,;\s]+',block.contents[match_end:end_check_idx].lower())
-        begin_check_idx = max(match.offset-30, 0)
-        previous_text = re.findall(r'[^.()\[\]{}:,;\s]+', block.contents[begin_check_idx:match.offset].lower())
         if check_quotes(match.offset, match.offset + match.error_length, block.contents):
             is_error = 0
         elif check_if_proper(block.block, match, is_diff= True):
             is_error = 0
-        elif following_text and len(set(black_list).intersection(following_text)) > 0:
+        elif in_black_list:
             is_error = 2
         elif previous_text and len(set(white_list_pl).intersection(previous_text)) > 0:
             is_error = 0
