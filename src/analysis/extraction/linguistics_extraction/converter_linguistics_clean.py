@@ -75,19 +75,38 @@ class PDFMapper:
         )
 
     @staticmethod
-    def _adjust_item_word_positions(item_words):
+    def adjust_item_word_positions(item_words, raw_text=None, cleaned_text=None):
         """
         Adjusts the character position indices of words within a list item
-        by removing the offset caused by the list marker (e.g., bullet point, number).
+        by removing the offset caused by the list marker (bullet point, number etc).
 
         Args:
-            item_words (list): A list of WordInfo objects belonging to a single list item.
+            item_words (list[WordInfo]): Words belonging to a single list item.
+            raw_text (str): Item text including the list marker.
+            cleaned_text (str): Item text with the list marker stripped.
         """
-        if len(item_words) > 1:
+
+        marker_offset = None
+        if raw_text and cleaned_text:
+            pozycja = raw_text.find(cleaned_text)
+            if pozycja >= 0:
+                marker_offset = pozycja
+        if marker_offset is None:
+            if len(item_words) <= 1:
+                return
             marker_offset = item_words[1].start_char
-            for word in item_words[1:]:
-                word.start_char -= marker_offset
-                word.end_char -= marker_offset
+
+        for word in item_words:
+            word.start_char -= marker_offset
+            word.end_char -= marker_offset
+
+
+        for word in item_words:
+            if word.start_char < 0:
+                word.start_char = 0
+            if word.end_char < 0:
+                word.end_char = 0
+
 
     @staticmethod
     def is_header(words: list[WordInfo]) -> bool:
@@ -797,8 +816,10 @@ class PDFMapper:
                                 "original_text": full_text,
                             }
                         )
-                        self._adjust_item_word_positions(
-                            self.list_buffer[-1]["item"].words
+                        self.adjust_item_word_positions(
+                            self.list_buffer[-1]["item"].words,
+                            full_text,
+                            cleaned_text,
                         )
                         full_text, words_info, self.curr_line = "", [], 0
 
@@ -880,8 +901,10 @@ class PDFMapper:
                                         "original_text": full_text,
                                     }
                                 )
-                                self._adjust_item_word_positions(
-                                    self.list_buffer[-1]["item"].words
+                                self.adjust_item_word_positions(
+                                    self.list_buffer[-1]["item"].words,
+                                    full_text,
+                                    cleaned_text,
                                 )
                             else:
                                 if self.list_buffer and not is_visual_caption:
@@ -972,7 +995,7 @@ class PDFMapper:
                         "original_text": full_text,
                     }
                 )
-                self._adjust_item_word_positions(self.list_buffer[-1]["item"].words)
+                self.adjust_item_word_positions(self.list_buffer[-1]["item"].words, full_text, cleaned_text)
             elif is_valid_list_cont:
                 last_item_data = self.list_buffer[-1]
                 connector = (
@@ -1027,6 +1050,8 @@ class PDFMapper:
                 caption="",
             )
             new_doc.floating_elements.visual_elements.append(ve)
+
+
 
     def _merge_adjacent_headings(self):
         """
@@ -1370,6 +1395,10 @@ class PDFMapper:
 
                 for match in citation_pattern.finditer(text):
                     cit_content = match.group(1)
+
+                    if len(re.findall(r"\d+", cit_content)) > 1:
+                        continue
+
                     nums = extract_numbers_from_citation(cit_content)
 
                     if nums and not nums.issubset(valid_bib_numbers):
