@@ -67,7 +67,7 @@ def check_if_was_defined(blocks, acronyms_with_definitions, proper_names):
 
     for b in blocks:
         block = b.block
-        if block.language == "pl":
+        if b.language == "pl":
             message = message_pol
         else:
             message = message_eng

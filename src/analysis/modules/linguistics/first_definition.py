@@ -29,7 +29,7 @@ def initials_match(acronym, definition, proper_names, block = None):
         if idx == len(acronym):
             break
 
-    if matched and idx == len(acronym):
+    if (matched and idx == len(acronym)) or camel_case_match(acronym, org_words):
         proper_names.append((acronym, acronym))
         for word_raw in re.split(r'\s+', definition.strip()):
             word_clean = word_raw.strip(string.punctuation + string.whitespace)
@@ -61,6 +61,14 @@ def initials_match(acronym, definition, proper_names, block = None):
             return True
 
     return False
+
+def camel_case_match(acronym, words):
+    """
+    Check if the acronym matches the uppercase letters of the definition words, so CamelCase words give one initial per part.
+    """
+
+    initials = [c for w in words for c in w if c.isupper()]
+    return initials[:len(acronym)] == list(acronym)
 
 def sequence_match(acronym, initials):
     """
@@ -131,22 +139,23 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
     acronyms_with_definitions = {}
     bibliography_re = re.compile(r"^\[\d+\]")
     list_acronyms = re.compile(r'^[A-Z]{2,}\s+[\u2013\u2014\-\u2212:]\s|^((\S+\s){1,4})[\u2013\u2014\-\u2212:]\s')
-    paragraph_def_first = re.compile(r'(?<![A-Za-z\u0104\u0106\u0118\u0141\u0143\u00d3\u015a\u0179\u017b\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([A-Z\u0104\u0106\u0118\u0141\u0143\u00d3\u015a\u0179\u017b][a-zA-Z\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})\)(?=[,\s\.\)\;]|$)',re.UNICODE)
-    paragraph_def_first_lower = re.compile(r'(?<![A-Za-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([a-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c][a-zA-Z\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})\)(?=[,\s\.\)\;]|$)',re.UNICODE)
-    paragraph_def_with_comma = re.compile(r'(?<![A-Za-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([a-zA-Z\u0104-\u017e][a-zA-Z\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})[,\s]',re.UNICODE)
+    paragraph_def_first = re.compile(r'(?<![A-Za-z\u0104\u0106\u0118\u0141\u0143\u00d3\u015a\u0179\u017b\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([A-Z\u0104\u0106\u0118\u0141\u0143\u00d3\u015a\u0179\u017b][a-zA-Z\u00d3\u00f3\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})\)(?=[,\s\.\)\;]|$)',re.UNICODE)
+    paragraph_def_first_lower = re.compile(r'(?<![A-Za-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([a-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c][a-zA-Z\u00d3\u00f3\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})\)(?=[,\s\.\)\;]|$)',re.UNICODE)
+    paragraph_def_with_comma = re.compile(r'(?<![A-Za-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c])([a-zA-Z\u00d3\u00f3\u0104-\u017e][a-zA-Z\u00d3\u00f3\u0104-\u017e\s\-]{2,}?)\s*\(([A-Z]{2,})[,\s]',re.UNICODE)
     paragraph_acr_first = re.compile(r'\(([A-Z]{2,})\)\s([A-Z\u00c0-\u017d][a-z\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c\w\s]+)')
     paragraph_ang_pattern = re.compile(r'\b([A-Z]{2,})\s*\((?:ang\.|pol\.|fr\.|niem\.)\s+([^)]{3,}?)\s*\)', re.UNICODE)
-    paragraph_ang_pol_pattern = re.compile(r'\b([A-Z]{2,10})\s*\(\s*(?:ang\.|pol\.|niem\.|fr\.|łac\.)?\s*([A-Za-z\u0104-\u017e][A-Za-z\u0104-\u017e\s\-]{3,}?)\s*(?:,|;|\s{2,})', re.UNICODE)
+    paragraph_ang_pol_pattern = re.compile(r'\b([A-Z]{2,10})\s*\(\s*(?:ang\.|pol\.|niem\.|fr\.|łac\.)?\s*([A-Za-z\u00d3\u00f3\u0104-\u017e][A-Za-z\u00d3\u00f3\u0104-\u017e\s\-]{3,}?)\s*(?:,|;|\s{2,})', re.UNICODE)
     paragraph_acr_then_expansion = re.compile(r'\b([A-Z]{2,})\s*\(([A-Z][a-zA-ZÀ-Ž][a-zA-ZÀ-Žąćęłńóśźż\s\-]{2,})\)')
     paragraph_acr_quoted = re.compile(r'\b([A-Z]{2,})\s*\(["\u201e\u201c\u00ab\u2018]([A-Za-z][^"\u201d\u00bb\u2019)]{3,}?)["\u201d\u00bb\u2019]\)',re.UNICODE)
-    broken_parenthesis_ang = re.compile(r'\b([A-Z]{2,})\s*\(\s*(?:ang\.|pol\.|fr\.|niem\.)\s+([A-Za-z\u0104-\u017e\s\-]{3,}?)\s*(?:\)|,|$)', re.UNICODE)
-    broken_parenthesis_acr_dash = re.compile(r'\(\s*([A-Z]{2,})\s*[\-\u2013\u2014:]\s*(?:ang\.|pol\.|fr\.|niem\.)?\s*([A-Za-z\u0104-\u017e\s\-]{3,}?)\s*(?:\)|,|$)', re.UNICODE)
-    parenthesis_def_dash_acr = re.compile(r'\(\s*(?:ang\.|pol\.|fr\.|niem\.|łac\.)?\s*([A-Za-z\u0104-\u017e][A-Za-z\u0104-\u017e\s\-]{2,}?)\s*[\-\u2013\u2014]\s*([A-Z]{2,})\s*\)', re.UNICODE)
+    broken_parenthesis_ang = re.compile(r'\b([A-Z]{2,})\s*\(\s*(?:ang\.|pol\.|fr\.|niem\.)\s+([A-Za-z\u00d3\u00f3\u0104-\u017e\s\-]{3,}?)\s*(?:\)|,|$)', re.UNICODE)
+    broken_parenthesis_acr_dash = re.compile(r'\(\s*([A-Z]{2,})\s*[\-\u2013\u2014:]\s*(?:ang\.|pol\.|fr\.|niem\.)?\s*([A-Za-z\u00d3\u00f3\u0104-\u017e\s\-]{3,}?)\s*(?:\)|,|$)', re.UNICODE)
+    parenthesis_def_dash_acr = re.compile(r'\(\s*(?:ang\.|pol\.|fr\.|niem\.|łac\.)?\s*([A-Za-z\u00d3\u00f3\u0104-\u017e][A-Za-z\u00d3\u00f3\u0104-\u017e\s\-]{2,}?)\s*[\-\u2013\u2014]\s*([A-Z]{2,})\s*\)', re.UNICODE)
     broken_no_parenthesis_svm = re.compile(r'\b([A-Z]{2,})\s+([A-Z][a-z]+\s+[A-Z][a-z]+[\w\s\-]*)\s*\)', re.UNICODE)
-    paragraph_ang_phrase = re.compile(r'((?:[A-Za-z\u0104-\u017e][A-Za-z\u0104-\u017e\-]*\s+){1,3})\((?:ang\.|pol\.|niem\.|fr\.|\u0142ac\.)\s+([^)]{3,}?)\)', re.UNICODE)
-    paragraph_ang_def_acr = re.compile(r'\((?:ang\.|pol\.|niem\.|fr\.)\s+([A-Za-z\u0104-\u017e\s\-,]{3,}?),\s*([A-Z]{2,})\)', re.UNICODE)
+    paragraph_ang_phrase = re.compile(r'((?:[A-Za-z\u00d3\u00f3\u0104-\u017e][A-Za-z\u00d3\u00f3\u0104-\u017e\-]*\s+){1,3})\((?:ang\.|pol\.|niem\.|fr\.|\u0142ac\.)\s+([^)]{3,}?)\)', re.UNICODE)
+    paragraph_ang_def_acr = re.compile(r'\((?:ang\.|pol\.|niem\.|fr\.)\s+([A-Za-z\u00d3\u00f3\u0104-\u017e\s\-,]{3,}?),\s*([A-Z]{2,})\s*\)', re.UNICODE)
     simple_paren_acronym = re.compile(r'([\w][\wąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]{3,}?)\s\(([A-Z]{2,6})\)',re.UNICODE)
-    paragraph_acr_expansion_suffix = re.compile(r'\b([A-Z]{2,})\s*\((?:ang\.|pol\.|fr\.|niem\.|łac\.)?\s*([A-Za-z\u0104-\u017e][A-Za-z\u0104-\u017e\s\-]{2,}?)\s*[\-\u2013\u2014,;]\s*(?:ang\.|pol\.|fr\.|niem\.|łac\.)[^)]*\)', re.UNICODE)
+    paragraph_acr_expansion_suffix = re.compile(r'\b([A-Z]{2,})\s*\((?:ang\.|pol\.|fr\.|niem\.|łac\.)?\s*([A-Za-z\u00d3\u00f3\u0104-\u017e][A-Za-z\u00d3\u00f3\u0104-\u017e\s\-]{2,}?)\s*[\-\u2013\u2014,;]\s*(?:ang\.|pol\.|fr\.|niem\.|łac\.)[^)]*\)', re.UNICODE)
+    paragraph_def_then_ang = re.compile(r'\b([A-Z]{2,})\s*\([^()]*?[\s,;\-\u2013\u2014]\s*(?:ang\.|pol\.|fr\.|niem\.|łac\.)\s+([^()]{3,}?)\s*\)', re.UNICODE)
     split = re.compile(r"\s[-\u2013\u2014]\s")
 
     if extracted_acronyms:
@@ -201,6 +210,16 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
                             proper_names.append((word_clean, word_lemma))
                     if initials_match(new_acronym[0], new_acronym[1], proper_names, block):
                         acronyms_with_definitions = check_position_if_new(new_acronym[0], new_acronym[1], words, block.block_id, acronyms_with_definitions)
+                for acronym, definition in paragraph_def_then_ang.findall(text):
+                    if acronym in acronyms_with_definitions:
+                        continue
+                    for word_raw in re.split(r'\s+', definition.strip()):
+                        word_clean = word_raw.strip(string.punctuation + string.whitespace)
+                        if len(word_clean) >= 2:
+                            word_lemma = lemmatization(word_clean, b.language)
+                            proper_names.append((word_clean, word_lemma))
+                    if initials_match(acronym, definition, proper_names, block):
+                        acronyms_with_definitions = check_position_if_new(acronym, definition, words, block.block_id, acronyms_with_definitions)
                 for before_phrase, inside_phrase in paragraph_ang_phrase.findall(text):
                     for phrase in (before_phrase, inside_phrase):
                         for word_raw in re.split(r'\s+', phrase.strip()):
@@ -246,5 +265,10 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
                     if potential_acronym(acronym):
                         proper_names.append((acronym, acronym))
                         acronyms_with_definitions = check_position_if_new(acronym, definition, words, block.block_id, acronyms_with_definitions)
-    
+
+    # debug: lista wszystkich wykrytych akronimów
+    print(f"[DEBUG] Wykryte akronimy ({len(acronyms_with_definitions)}):")
+    for acronym, (definition, source, page, _) in acronyms_with_definitions.items():
+        print(f"  {acronym} = {definition!r} (str. {page}, źródło: {source})")
+
     return acronyms_with_definitions, proper_names

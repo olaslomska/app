@@ -88,9 +88,9 @@ class PDFMapper:
 
         marker_offset = None
         if raw_text and cleaned_text:
-            pozycja = raw_text.find(cleaned_text)
-            if pozycja >= 0:
-                marker_offset = pozycja
+            word_position = raw_text.find(cleaned_text)
+            if word_position >= 0:
+                marker_offset = word_position
         if marker_offset is None:
             if len(item_words) <= 1:
                 return
@@ -99,7 +99,6 @@ class PDFMapper:
         for word in item_words:
             word.start_char -= marker_offset
             word.end_char -= marker_offset
-
 
         for word in item_words:
             if word.start_char < 0:
