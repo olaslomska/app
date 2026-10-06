@@ -266,9 +266,4 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
                         proper_names.append((acronym, acronym))
                         acronyms_with_definitions = check_position_if_new(acronym, definition, words, block.block_id, acronyms_with_definitions)
 
-    # debug: lista wszystkich wykrytych akronimów
-    print(f"[DEBUG] Wykryte akronimy ({len(acronyms_with_definitions)}):")
-    for acronym, (definition, source, page, _) in acronyms_with_definitions.items():
-        print(f"  {acronym} = {definition!r} (str. {page}, źródło: {source})")
-
     return acronyms_with_definitions, proper_names

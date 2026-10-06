@@ -44,9 +44,29 @@ def fix_latex(text):
         text = text.replace(wrong, right)
     return text
 
-# Niestety używanie samego dicta powoduje, że nie można dokładnie rozdzielić spanów na same słowa z informacją
-# o ich położeniu. Natomiast sama lista słów zwraca dokładne koordynaty słowa, ale nie pozwala na
-# detekcję czcionki, itd. W związku z tym użyto zarówno dicta jak i listy słów, aby połączyć korzyści.
+WORD_MATCH_PUNCT = ('(', ')', '[', ']', '{', '}', '"', "'", '”', '„',
+                    '.', ',', ':', ';', '?', '!', '-')
+
+
+def check_if_span_taken(word, current_span, raw_line) -> bool:
+    """
+    Helper function that checks, if span is going to be taken in by other span, to avoid duplicating.
+    """
+    wt = word[4]
+    m_left = 15.0 if wt and wt[0] in WORD_MATCH_PUNCT else 0.2
+    m_right = 15.0 if wt and wt[-1] in WORD_MATCH_PUNCT else 0.2
+    x_center = (word[0] + word[2]) / 2
+    for span in raw_line["spans"]:
+        if span is current_span or not span["text"].strip():
+            continue
+        span_bbox = span["bbox"]
+        if not (span_bbox[0] - 1.0 <= x_center <= span_bbox[2] + 1.0):
+            continue
+        if (word[0] >= span_bbox[0] - m_left and word[1] >= span_bbox[1] - 1.0 and word[2] <= span_bbox[2] + m_right and word[3] <= span_bbox[3] + 1.0):
+            return True
+    return False
+
+
 def parse_text_block(
     raw_block: dict,
     word_list: list,
@@ -75,7 +95,7 @@ def parse_text_block(
         spans = []
         max_font_size = 0.0  # Do znalezienia słowa o największej czcionce w linijce.
 
-        for raw_span in raw_line["spans"]:
+        for idx_raw, raw_span in enumerate(raw_line["spans"]):
             if not raw_span["text"].strip():
                 continue
 
@@ -87,6 +107,10 @@ def parse_text_block(
 
             for x in block_words:
                 if x in used_words:
+                    continue
+
+                x_center = (x[0] + x[2]) / 2
+                if not (s_bbox[0] - 1.0 <= x_center <= s_bbox[2] + 1.0):
                     continue
 
                 # Zmienne przydatne do łatki na ucinanie słów przy nawiasach, cudzysłowach, itp.
@@ -145,24 +169,36 @@ def parse_text_block(
                 start_match = re.match(r'^([(),.;:!?\[\]\{\}"”„]+)', raw_text_stripped)
                 end_match = re.search(r'([(),.;:!?\[\]\{\}"”„]+)$', raw_text_stripped)
 
-                if start_match and not first_word_text.startswith(start_match.group(1)):
-                    missing_start = start_match.group(1)
-                if end_match and not last_word_text.endswith(end_match.group(1)):
-                    missing_end = end_match.group(1)
+                if start_match:
+                    run = start_match.group(1)
+                    common_chars = max(i for i in range(len(run) + 1)
+                                  if first_word_text.startswith(run[:i]))
+                    missing_start = run[common_chars:]
+                if end_match:
+                    run = end_match.group(1)
+                    common_chars = max(i for i in range(len(run) + 1)
+                                  if last_word_text.endswith(run[len(run) - i:]))
+                    missing_end = run[:len(run) - common_chars]
 
-                for idx, orig_x in enumerate(span_words):
-                    x = list(orig_x)
+                combined= " ".join(w[4] for w in span_words)
+                if raw_text_stripped and raw_text_stripped in combined:
+                    missing_start = ""
+                    missing_end = ""
+
+                for idx, original_x in enumerate(span_words):
+                    x = list(original_x)
                     if idx == 0 and missing_start:
-                        is_closing_punct = all(c in ".,;:!?)]}”" for c in missing_start)
+                        is_closing_punct = all(char in ".,;:!?)]}”" for char in missing_start)
                         if is_closing_punct and len(spans) > 0:
-                            spans[-1].text += missing_start
-                            p_box = spans[-1].bbox
-                            spans[-1].bbox = (
-                                p_box[0],
-                                p_box[1],
-                                p_box[2] + 4.0,
-                                p_box[3],
-                            )
+                            if not spans[-1].text.rstrip().endswith(missing_start):
+                                spans[-1].text += missing_start
+                                p_box = spans[-1].bbox
+                                spans[-1].bbox = (
+                                    p_box[0],
+                                    p_box[1],
+                                    p_box[2] + 4.0,
+                                    p_box[3],
+                                )
                         else:
                             x[4] = missing_start + x[4]
                             x[0] -= 4.0
@@ -185,6 +221,21 @@ def parse_text_block(
                         )
                     )
             else:
+                overlapping = [
+                    x for x in block_words
+                    if x[0] < s_bbox[2] and x[2] > s_bbox[0]
+                    and x[1] < s_bbox[3] and x[3] > s_bbox[1]
+                ]
+                if overlapping and all(x in used_words for x in overlapping):
+                    continue
+
+                changed_font = next(
+                    (s["font"] for s in raw_line["spans"][idx_raw + 1:] if s["text"].strip()),
+                    None,
+                )
+                if changed_font is not None and changed_font != raw_span["font"] and any(
+                        check_if_span_taken(x, raw_span, raw_line) for x in overlapping):
+                    continue
                 current_span_id += 1
                 spans.append(
                     TextSpan(
