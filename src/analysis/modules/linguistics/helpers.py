@@ -13,6 +13,7 @@ from spellchecker import SpellChecker
 from common.path import LANGUAGETOOL_DIR, resource_path
 import sys
 import re
+import unicodedata
 from pathlib import Path
 import logging
 
@@ -116,6 +117,18 @@ def language(text):
         return 'pl'
     else:
         return 'en'
+
+def normalize_math_letters(text):
+    '''Replaces letters and digits written with math font with plain ones.'''
+    return "".join(unicodedata.normalize("NFKC", c) if "\U0001D400" <= c <= "\U0001D7FF" else c for c in text)
+
+def has_math_characters(text):
+    '''Checks if the text contains math symbols'''
+    return any("\U0001D400" <= c <= "\U0001D7FF" or unicodedata.category(c) == "Sm" for c in text)
+
+def is_latin_word(text):
+    '''Checks if every letter of the text belongs to the Latin alphabet'''
+    return all(unicodedata.name(c, "").startswith("LATIN") for c in text if c.isalpha())
 
 def get_match_info(block, offset, length):
     '''Adjust coordinates of text content to its position in pdf based on extraction structure.

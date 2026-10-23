@@ -16,11 +16,11 @@ def check_exeptions(matches, blocks, proper_names, main_font):
     valid_errors = []
     blocks_to_check = defaultdict(list)
     for match in matches:
-        blocks_to_check[f'{match.block_id}_{match.page_start}'].append(match)
+        blocks_to_check[match.block_id].append(match)
     for block in blocks:
         if not block.block.words:
             continue
-        block_key = f'{block.block.block_id}_{block.block.words[0].page_number}'
+        block_key = block.block.block_id
         if block_key in blocks_to_check:
             for match in blocks_to_check[block_key]:
                 text = block.contents

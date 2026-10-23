@@ -1,6 +1,6 @@
 import re
 import string
-from .helpers import language, lemmatization, add_match, get_match_info
+from .helpers import language, lemmatization, add_match, get_match_info, normalize_math_letters
 from .check_acronym import potential_acronym
 import logging
 
@@ -110,7 +110,7 @@ def check_position_if_new(new_acronym, definition, words, block_id, acronyms_wit
         word_page, word_bbox = None, None
         
         for w in words_list:
-            clean_word_text = w.text.strip('.,()[]{}:;"\'')
+            clean_word_text = normalize_math_letters(w.text).strip('.,()[]{}:;"\'')
             if clean_word_text == new_acronym_clean:
                 word_page = w.page_number
                 word_bbox = w.bbox
@@ -118,7 +118,7 @@ def check_position_if_new(new_acronym, definition, words, block_id, acronyms_wit
                 
         if word_page is None:
             for w in words_list:
-                clean_word_text = w.text.strip('.,()[]{}:;"\'')
+                clean_word_text = normalize_math_letters(w.text).strip('.,()[]{}:;"\'')
                 if clean_word_text.startswith(new_acronym_clean):
                     word_page = w.page_number
                     word_bbox = w.bbox
@@ -188,8 +188,10 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
                 item_page = item.words[0].page_number
                 item_bbox = item.words[0].bbox
 
-            initials_match(item.acronym, item.definition, proper_names)
-            acronyms_with_definitions[item.acronym] = (item.definition, "official_list", item_page, item_bbox)
+            acronym = normalize_math_letters(item.acronym)
+            definition = normalize_math_letters(item.definition)
+            initials_match(acronym, definition, proper_names)
+            acronyms_with_definitions[acronym] = (definition, "official_list", item_page, item_bbox)
 
     for b in blocks:
         block = b.block
@@ -202,8 +204,9 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
             if block.is_bibliography:
                 continue
             for item in block.items:
-                if list_acronyms.search(item.text):
-                    new_acronym = split.split(item.text, 1)
+                item_text = normalize_math_letters(item.text)
+                if list_acronyms.search(item_text):
+                    new_acronym = split.split(item_text, 1)
                     new_acronym[0] = new_acronym[0].strip()
                     if len(new_acronym) > 1 and potential_acronym(new_acronym[0]):
                         acronyms_with_definitions = check_position_if_new(new_acronym[0], new_acronym[1].strip(), item.words, block.block_id, acronyms_with_definitions)
@@ -213,7 +216,8 @@ def check_first_definition(blocks, proper_names, extracted_acronyms):
             if block.type == "list" and block.is_bibliography:
                 continue
             if '(' in block.content or ')' in block.content:
-                text = block.content
+                # formula letters (𝐵𝐹𝑆) as plain ones, so a definition is found whatever its font; offsets stay valid
+                text = normalize_math_letters(block.content)
                 new_acronyms = paragraph_acr_first.findall(text)
                 new_acronyms.extend(paragraph_acr_then_expansion.findall(text))
                 new_acronyms.extend(paragraph_ang_pattern.findall(text))
