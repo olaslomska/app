@@ -1185,6 +1185,7 @@ class PDFMapper:
         self._verify_bibliography_references()
         self._verify_caption_sources(new_doc)
         self._fix_offsets()
+        self._assign_unique_ids()
 
         new_doc.metadata["main_font"] = old_doc.get_most_common_font()
 
@@ -2746,6 +2747,17 @@ class PDFMapper:
                 shift += 1
             else:
                 word.word_index -= shift
+
+    def _assign_unique_ids(self):
+        """
+        Renumbers block_id (unique in the document), item_id (unique in the list) and word_index (unique in the block).
+        """
+        for block_no, block in enumerate(self.logical_blocks):
+            block.block_id = f"list_{block_no}" if isinstance(block, ListBlock) else block_no
+            for word_no, word in enumerate(block.words):
+                word.word_index = word_no
+            for item_no, item in enumerate(getattr(block, "items", [])):
+                item.item_id = item_no
 
 
 # Funkcje zewnętrzne
